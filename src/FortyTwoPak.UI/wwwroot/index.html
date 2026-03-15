@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>42pak</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+      crossorigin="anonymous" referrerpolicy="no-referrer">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- LEFT SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">42<span>pak</span></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-view="create"><i class="fa-solid fa-plus"></i>Create</a>
+      <a class="nav-item" data-view="manage"><i class="fa-solid fa-box-archive"></i>Manage</a>
+      <a class="nav-item" data-view="convert"><i class="fa-solid fa-right-left"></i>Convert</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a class="nav-item" data-view="settings"><i class="fa-solid fa-gear"></i>Settings</a>
+      <a class="nav-item" data-view="help"><i class="fa-solid fa-circle-question"></i>Help</a>
+      <div class="sidebar-ver">v1.0.0</div>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA -->
+  <main id="main">
+
+    <!-- TITLEBAR -->
+    <header id="titlebar">
+      <div class="titlebar-drag"></div>
+      <div id="view-title">Create Archive</div>
+      <div class="titlebar-actions">
+        <div class="search-wrap" id="search-wrap" style="display:none">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="search-input" placeholder="Filter files...">
+        </div>
+      </div>
+    </header>
+
+    <!-- VIEWS -->
+    <div id="views">
+
+      <!-- CREATE -->
+      <section class="view active" id="v-create">
+        <div class="panel">
+          <div class="panel-head">Source</div>
+          <div class="field-row">
+            <label>Directory</label>
+            <div class="field-input">
+              <input type="text" id="c-src" placeholder="Select folder with game assets" readonly>
+              <button class="btn-sm" onclick="pickSourceFolder()">Browse</button>
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Output</label>
+            <div class="field-input">
+              <input type="text" id="c-out" placeholder="Output .vpk path" readonly>
+              <button class="btn-sm" onclick="pickOutputFile()">Browse</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">Encryption</div>
+          <div class="field-row">
+            <label>AES-256-GCM</label>
+            <label class="switch"><input type="checkbox" id="c-enc" checked><span></span></label>
+          </div>
+          <div id="c-pass-fields">
+            <div class="field-row">
+              <label>Passphrase</label>
+              <div class="field-input">
+                <input type="password" id="c-pass" placeholder="Min 8 characters">
+                <button class="btn-sm btn-icon" onclick="toggleVis('c-pass')"><i class="fa-solid fa-eye"></i></button>
+              </div>
+            </div>
+            <div class="field-row">
+              <label>Confirm</label>
+              <input type="password" id="c-pass2" placeholder="Re-enter passphrase">
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">Options</div>
+          <div class="field-row">
+            <label>Algorithm</label>
+            <select id="c-algo">
+              <option value="LZ4">LZ4</option>
+              <option value="Zstandard">Zstandard</option>
+              <option value="Brotli">Brotli</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label>Compression</label>
+            <div class="range-wrap">
+              <input type="range" id="c-comp" min="0" max="12" value="3">
+              <span id="c-comp-val">3</span>
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Mangle names</label>
+            <label class="switch"><input type="checkbox" id="c-mangle"><span></span></label>
+          </div>
+          <div class="field-row">
+            <label>Author</label>
+            <input type="text" id="c-author" placeholder="Optional">
+          </div>
+          <div class="field-row">
+            <label>Comment</label>
+            <input type="text" id="c-comment" placeholder="Optional">
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <div id="c-progress" class="progress" style="display:none">
+            <div class="progress-track"><div class="progress-fill" id="c-progress-fill"></div></div>
+            <span id="c-progress-txt"></span>
+          </div>
+          <button class="btn-primary" id="btn-build" onclick="buildVpk()">
+            <i class="fa-solid fa-hammer"></i> Build Archive
+          </button>
+        </div>
+      </section>
+
+      <!-- MANAGE -->
+      <section class="view" id="v-manage">
+        <div class="toolbar">
+          <button class="btn-sm" onclick="openVpkFile()"><i class="fa-solid fa-folder-open"></i> Open VPK</button>
+          <button class="btn-sm" id="btn-extract" onclick="extractAllFiles()" disabled><i class="fa-solid fa-download"></i> Extract All</button>
+          <button class="btn-sm" id="btn-validate" onclick="validateArchive()" disabled><i class="fa-solid fa-shield-halved"></i> Validate</button>
+        </div>
+        <div id="archive-meta" class="meta-bar" style="display:none"></div>
+        <div id="file-list" class="file-list">
+          <div class="empty-msg"><i class="fa-solid fa-box-open"></i><p>Open a .vpk archive to inspect its contents.</p></div>
+        </div>
+      </section>
+
+      <!-- CONVERT -->
+      <section class="view" id="v-convert">
+        <div class="notice notice-warn">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <div><strong>One-way migration.</strong> Converts unencrypted EIX/EPK entries to VPK. TEA/Panama/HybridCrypt entries must be decrypted with EterNexus first.</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Input</div>
+          <div class="field-row">
+            <label>EIX File</label>
+            <div class="field-input">
+              <input type="text" id="cv-eix" placeholder="Select .eix file" readonly>
+              <button class="btn-sm" onclick="pickEixFile()">Browse</button>
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Output VPK</label>
+            <div class="field-input">
+              <input type="text" id="cv-out" placeholder="Output .vpk path" readonly>
+              <button class="btn-sm" onclick="pickConvertOutput()">Browse</button>
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Encrypt output</label>
+            <label class="switch"><input type="checkbox" id="cv-enc"><span></span></label>
+          </div>
+          <div id="cv-pass-row" class="field-row" style="display:none">
+            <label>Passphrase</label>
+            <input type="password" id="cv-pass" placeholder="Passphrase for output">
+          </div>
+        </div>
+        <div class="action-bar">
+          <button class="btn-primary" id="btn-convert" onclick="convertPak()"><i class="fa-solid fa-right-left"></i> Convert</button>
+        </div>
+        <div id="cv-log" class="log-box" style="display:none">
+          <div class="log-head">Log</div>
+          <pre id="cv-log-txt"></pre>
+        </div>
+        <div id="eix-preview" style="display:none">
+          <div class="panel-head" style="margin-top:16px">EIX Preview</div>
+          <div id="eix-grid" class="file-list"></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" id="v-settings">
+        <div class="panel">
+          <div class="panel-head">Appearance</div>
+          <div class="field-row">
+            <label>Dark mode</label>
+            <label class="switch"><input type="checkbox" id="s-dark" checked onchange="toggleTheme()"><span></span></label>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Defaults</div>
+          <div class="field-row">
+            <label>Default compression</label>
+            <div class="range-wrap">
+              <input type="range" id="s-comp" min="0" max="12" value="3">
+              <span id="s-comp-val">3</span>
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Encrypt by default</label>
+            <label class="switch"><input type="checkbox" id="s-enc" checked><span></span></label>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">About</div>
+          <p class="text-dim">42pak-generator v1.0.0<br>Open-source VPK archive tool for Metin2.<br>MIT License</p>
+        </div>
+      </section>
+
+      <!-- HELP -->
+      <section class="view" id="v-help">
+        <div class="panel">
+          <div class="panel-head">Quick Start</div>
+          <ol class="help-list">
+            <li>Go to <strong>Create</strong></li>
+            <li>Pick a source folder with your game assets</li>
+            <li>Set an output path for the .vpk</li>
+            <li>Enter an encryption passphrase</li>
+            <li>Click <strong>Build Archive</strong></li>
+          </ol>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Metin2 Integration</div>
+          <p class="text-dim">After building a .vpk, integrate it with your client/server:</p>
+          <ol class="help-list">
+            <li>Copy <code>VpkLoader.cpp/h</code> into <code>EterPack/</code></li>
+            <li>Modify <code>CEterPackManager</code> to use the VPK loader</li>
+            <li>Rebuild client with VS2022</li>
+            <li>For server, add <code>VpkHandler.cpp/h</code> to game source</li>
+          </ol>
+          <p class="text-dim">See the <code>Metin2Integration/</code> folder for ready-to-use files.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Security</div>
+          <ul class="help-list">
+            <li>AES-256-GCM per-file encryption with unique nonces</li>
+            <li>PBKDF2-SHA512 key derivation with 200,000 iterations</li>
+            <li>HMAC-SHA256 whole-archive tamper detection</li>
+            <li>BLAKE3 per-file integrity verification</li>
+            <li>SHA256-based filename obfuscation</li>
+            <li>Use strong, unique passphrases per archive</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Format</div>
+          <pre class="format-block">VPK Layout
++--------------------------+
+| Header       512 bytes   |  "42PK" magic, version, config
++--------------------------+
+| Data blocks              |  4096-aligned, LZ4/Zstd/Brotli, AES-256-GCM
++--------------------------+
+| Entry table              |  File index (encrypted)
++--------------------------+
+| HMAC-SHA256   32 bytes   |  Covers all preceding bytes
++--------------------------+</pre>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+<!-- MODAL -->
+<div id="modal-bg" class="modal-bg">
+  <div class="modal-box">
+    <div class="modal-top"><span id="modal-title"></span><button class="modal-x" onclick="closeModal()">&times;</button></div>
+    <div id="modal-body" class="modal-content"></div>
+    <div class="modal-foot"><button class="btn-sm" onclick="closeModal()">OK</button></div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
