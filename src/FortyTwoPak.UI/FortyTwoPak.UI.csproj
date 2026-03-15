@@ -8,7 +8,12 @@
     <Nullable>enable</Nullable>
     <RootNamespace>FortyTwoPak.UI</RootNamespace>
     <AssemblyName>FortyTwoPak</AssemblyName>
+    <ApplicationIcon>..\..\p42.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\p42.ico" LogicalName="p42.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2739.15" />

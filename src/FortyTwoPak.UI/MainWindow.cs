@@ -17,6 +17,10 @@ public class MainWindow : Form
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new System.Drawing.Size(900, 600);
 
+        using var iconStream = typeof(MainWindow).Assembly.GetManifestResourceStream("p42.ico");
+        if (iconStream != null)
+            Icon = new System.Drawing.Icon(iconStream);
+
         InitializeWebView();
     }
 
