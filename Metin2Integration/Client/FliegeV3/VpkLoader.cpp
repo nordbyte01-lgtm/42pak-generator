@@ -1,3 +1,17 @@
+//
+// VpkLoader.cpp — FliegeV3 Profile
+//
+// CVpkPack implementation for FliegeV3's binary-src EterPack architecture.
+// Reads .vpk archives and integrates with CEterFileDict via stub TEterPackIndex
+// entries with compressed_type == -1 as a sentinel.
+//
+// Differences from 40250 profile:
+//   - Includes paths match FliegeV3 source tree (../EterBase/ vs ../eterBase/)
+//   - No HybridCrypt references
+//   - FliegeV3 uses boost::unordered_multimap in CEterFileDict but the
+//     InsertItem API is identical
+//
+
 #include "StdAfx.h"
 #include "VpkLoader.h"
 #include "VpkCrypto.h"
@@ -6,12 +20,11 @@
 #include <cstring>
 #include <algorithm>
 
-#include "../EterPack/EterFileDict.h"
-#include "../EterBase/MappedFile.h"
 #include "../EterBase/CRC32.h"
+#include "../EterBase/MappedFile.h"
 
 CVpkPack::CVpkPack()
-    : m_bKeysReady(false)
+    : m_bKeysReady(false), m_pIndexData(nullptr)
 {
     std::memset(&m_header, 0, sizeof(m_header));
     std::memset(m_aesKey, 0, sizeof(m_aesKey));
@@ -20,6 +33,7 @@ CVpkPack::CVpkPack()
 
 CVpkPack::~CVpkPack()
 {
+    delete[] m_pIndexData;
     VpkCrypto::SecureZero(m_aesKey, sizeof(m_aesKey));
     VpkCrypto::SecureZero(m_hmacKey, sizeof(m_hmacKey));
 }
@@ -40,9 +54,7 @@ bool CVpkPack::Create(CEterFileDict& rkFileDict,
     if (m_header.IsEncrypted)
     {
         if (m_passphrase.empty())
-        {
             return false;
-        }
 
         if (!DeriveKeys())
             return false;
@@ -87,7 +99,6 @@ bool CVpkPack::ReadHeader()
     m_header.IsEncrypted = (boolByte != 0);
 
     file.read(reinterpret_cast<char*>(&m_header.CompressionLevel), 4);
-
     file.read(reinterpret_cast<char*>(&m_header.CompressionAlgorithm), 1);
 
     file.read(&boolByte, 1);
@@ -218,8 +229,9 @@ bool CVpkPack::ReadEntryTable()
     {
         std::string lower = m_entries[i].FileName;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        std::replace(lower.begin(), lower.end(), '\\', '/');
 
-        unsigned int crc = GetCRC32(lower.c_str(), lower.size());
+        DWORD crc = GetCRC32(lower.c_str(), lower.size());
         m_entryMap[crc] = i;
     }
 
@@ -228,128 +240,177 @@ bool CVpkPack::ReadEntryTable()
 
 void CVpkPack::RegisterEntries(CEterFileDict& rkFileDict)
 {
+    if (m_entries.empty())
+        return;
+
+    m_pIndexData = new TEterPackIndex[m_entries.size()];
+    std::memset(m_pIndexData, 0, sizeof(TEterPackIndex) * m_entries.size());
+
+    for (int i = 0; i < static_cast<int>(m_entries.size()); ++i)
+    {
+        TEterPackIndex& idx = m_pIndexData[i];
+
+        std::string lower = m_entries[i].FileName;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        std::replace(lower.begin(), lower.end(), '\\', '/');
+
+        size_t copyLen = (lower.size() < FILENAME_MAX_LEN) ? lower.size() : FILENAME_MAX_LEN;
+        std::memcpy(idx.filename, lower.c_str(), copyLen);
+        idx.filename[copyLen] = '\0';
+
+        idx.filename_crc = GetCRC32(lower.c_str(), lower.size());
+        idx.id = i;
+        idx.real_data_size = static_cast<long>(m_entries[i].OriginalSize);
+        idx.data_size = static_cast<long>(m_entries[i].StoredSize);
+        idx.data_position = 0;
+        idx.data_crc = 0;
+        idx.compressed_type = -1;  // sentinel: VPK entry
+
+        rkFileDict.InsertItem(reinterpret_cast<CEterPack*>(this), &idx);
+    }
 }
 
-bool CVpkPack::Get(CMappedFile& /*mappedFile*/, const char* filename, const void** data)
+bool CVpkPack::Get2(CMappedFile& mappedFile, const char* /*filename*/,
+                     TEterPackIndex* index, LPCVOID* data)
 {
-    std::string normalized(filename);
-    std::transform(normalized.begin(), normalized.end(), normalized.begin(), ::tolower);
-    std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    if (!index || index->id < 0 || index->id >= static_cast<long>(m_entries.size()))
+        return false;
 
-    unsigned int crc = GetCRC32(normalized.c_str(), normalized.size());
+    const TVpkEntry& entry = m_entries[index->id];
+
+    unsigned char* outData = nullptr;
+    int outSize = 0;
+
+    if (!DecryptAndDecompress(entry, &outData, &outSize))
+        return false;
+
+    *data = mappedFile.AppendDataBlock(outData, static_cast<DWORD>(outSize));
+    delete[] outData;
+    return (*data != nullptr);
+}
+
+bool CVpkPack::Get(CMappedFile& mappedFile, const char* filename, LPCVOID* data)
+{
+    std::string lower(filename);
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    std::replace(lower.begin(), lower.end(), '\\', '/');
+
+    DWORD crc = GetCRC32(lower.c_str(), lower.size());
     auto it = m_entryMap.find(crc);
     if (it == m_entryMap.end())
         return false;
 
     const TVpkEntry& entry = m_entries[it->second];
-
     unsigned char* outData = nullptr;
     int outSize = 0;
-    if (!ReadEntry(entry, &outData, &outSize))
+
+    if (!DecryptAndDecompress(entry, &outData, &outSize))
         return false;
 
-    *data = outData;
-    return true;
-}
-
-bool CVpkPack::ReadEntry(const TVpkEntry& entry,
-                          unsigned char** outData,
-                          int* outSize)
-{
-    std::ifstream file(m_filePath, std::ios::binary);
-    if (!file.is_open())
-        return false;
-
-    file.seekg(entry.DataOffset);
-
-    std::vector<unsigned char> storedData(static_cast<size_t>(entry.StoredSize));
-    file.read(reinterpret_cast<char*>(storedData.data()), entry.StoredSize);
-
-    unsigned char* current = storedData.data();
-    int currentSize = static_cast<int>(entry.StoredSize);
-
-    std::vector<unsigned char> decrypted;
-    if (entry.IsEncrypted)
-    {
-        if (!m_bKeysReady)
-            return false;
-
-        decrypted.resize(currentSize);
-        if (!VpkCrypto::AesGcmDecrypt(
-                current, currentSize,
-                m_aesKey,
-                entry.Nonce.data(),
-                entry.AuthTag.data(),
-                decrypted.data()))
-            return false;
-
-        current = decrypted.data();
-    }
-
-    std::vector<unsigned char> decompressed;
-    if (entry.IsCompressed)
-    {
-        if (m_header.CompressionAlgorithm != 1) // only LZ4 supported in C++ loader
-            return false;
-
-        int originalSize = *reinterpret_cast<const int*>(current);
-        if (originalSize != static_cast<int>(entry.OriginalSize))
-            return false;
-
-        decompressed.resize(originalSize);
-        int result = VpkCrypto::Lz4Decompress(
-            current + 4, currentSize - 4,
-            decompressed.data(), originalSize);
-
-        if (result <= 0)
-            return false;
-
-        current = decompressed.data();
-        currentSize = originalSize;
-    }
-
-    unsigned char hash[32];
-    VpkCrypto::Blake3Hash(current, currentSize, hash);
-
-    if (!VpkCrypto::ConstantTimeEquals(hash, entry.ContentHash.data(), 32))
-        return false;
-
-    *outData = new unsigned char[currentSize];
-    std::memcpy(*outData, current, currentSize);
-    *outSize = currentSize;
-    return true;
+    *data = mappedFile.AppendDataBlock(outData, static_cast<DWORD>(outSize));
+    delete[] outData;
+    return (*data != nullptr);
 }
 
 bool CVpkPack::IsExist(const char* filename) const
 {
-    std::string normalized(filename);
-    std::transform(normalized.begin(), normalized.end(), normalized.begin(), ::tolower);
-    std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    std::string lower(filename);
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    std::replace(lower.begin(), lower.end(), '\\', '/');
 
-    unsigned int crc = GetCRC32(normalized.c_str(), normalized.size());
+    DWORD crc = GetCRC32(lower.c_str(), lower.size());
     return m_entryMap.find(crc) != m_entryMap.end();
 }
 
 bool CVpkPack::GetNames(std::vector<std::string>* retNames) const
 {
     if (!retNames) return false;
+    retNames->clear();
     retNames->reserve(m_entries.size());
-    for (const auto& entry : m_entries)
-        retNames->push_back(entry.FileName);
+    for (const auto& e : m_entries)
+        retNames->push_back(e.FileName);
     return true;
 }
 
-const char* CVpkPack::GetDBName() const
-{
-    return m_dbName.c_str();
-}
+const char* CVpkPack::GetDBName() const { return m_dbName.c_str(); }
+const std::string& CVpkPack::GetPathName() const { return m_pathName; }
+const TVpkHeader& CVpkPack::GetHeader() const { return m_header; }
 
-const std::string& CVpkPack::GetPathName() const
+bool CVpkPack::DecryptAndDecompress(const TVpkEntry& entry,
+                                     unsigned char** outData, int* outSize)
 {
-    return m_pathName;
-}
+    std::ifstream file(m_filePath, std::ios::binary);
+    if (!file.is_open())
+        return false;
 
-const TVpkHeader& CVpkPack::GetHeader() const
-{
-    return m_header;
+    file.seekg(entry.DataOffset);
+    std::vector<unsigned char> storedData(static_cast<size_t>(entry.StoredSize));
+    file.read(reinterpret_cast<char*>(storedData.data()), entry.StoredSize);
+
+    std::vector<unsigned char> decryptedData;
+
+    if (entry.IsEncrypted)
+    {
+        if (!m_bKeysReady || entry.Nonce.size() != 12 || entry.AuthTag.size() != 16)
+            return false;
+
+        decryptedData.resize(storedData.size());
+        if (!VpkCrypto::AesGcmDecrypt(
+                storedData.data(), static_cast<int>(storedData.size()),
+                m_aesKey, entry.Nonce.data(), entry.AuthTag.data(),
+                decryptedData.data()))
+            return false;
+    }
+    else
+    {
+        decryptedData = std::move(storedData);
+    }
+
+    std::vector<unsigned char> finalData;
+
+    if (entry.IsCompressed && decryptedData.size() >= 4)
+    {
+        int originalSize = *reinterpret_cast<const int*>(decryptedData.data());
+        const unsigned char* compData = decryptedData.data() + 4;
+        int compLen = static_cast<int>(decryptedData.size()) - 4;
+
+        finalData.resize(originalSize);
+        int result = -1;
+
+        switch (m_header.CompressionAlgorithm)
+        {
+        case vpk::COMPRESS_LZ4:
+            result = VpkCrypto::Lz4Decompress(compData, compLen, finalData.data(), originalSize);
+            break;
+        case vpk::COMPRESS_ZSTD:
+            result = VpkCrypto::ZstdDecompress(compData, compLen, finalData.data(), originalSize);
+            break;
+        case vpk::COMPRESS_BROTLI:
+            result = VpkCrypto::BrotliDecompress(compData, compLen, finalData.data(), originalSize);
+            break;
+        default:
+            return false;
+        }
+
+        if (result < 0)
+            return false;
+    }
+    else
+    {
+        finalData = std::move(decryptedData);
+    }
+
+    // BLAKE3 integrity check
+    if (!entry.ContentHash.empty())
+    {
+        unsigned char hash[32];
+        VpkCrypto::Blake3Hash(finalData.data(), static_cast<int>(finalData.size()), hash);
+        if (!VpkCrypto::ConstantTimeEquals(hash, entry.ContentHash.data(), 32))
+            return false;
+    }
+
+    *outSize = static_cast<int>(finalData.size());
+    *outData = new unsigned char[*outSize];
+    std::memcpy(*outData, finalData.data(), *outSize);
+    return true;
 }

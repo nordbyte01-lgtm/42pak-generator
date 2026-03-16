@@ -4,8 +4,7 @@
 #include <vector>
 #include <unordered_map>
 
-class CEterFileDict;
-class CMappedFile;
+#include "../EterPack/EterPack.h"
 
 namespace vpk
 {
@@ -17,10 +16,18 @@ namespace vpk
     static const int HMAC_SIZE = 32;
     static const int PBKDF2_ITERATIONS = 200000;
     static const int SALT_LENGTH = 32;
-    static const int NONCE_SIZE = 12;   // AES-GCM nonce
-    static const int TAG_SIZE = 16;     // AES-GCM auth tag
-    static const int KEY_SIZE = 32;     // AES-256 key
+    static const int NONCE_SIZE = 12;
+    static const int TAG_SIZE = 16;
+    static const int KEY_SIZE = 32;
     static const int BLAKE3_HASH_SIZE = 32;
+
+    enum ECompressionAlgorithm
+    {
+        COMPRESS_NONE = 0,
+        COMPRESS_LZ4 = 1,
+        COMPRESS_ZSTD = 2,
+        COMPRESS_BROTLI = 3,
+    };
 }
 
 struct TVpkHeader
@@ -53,12 +60,15 @@ struct TVpkEntry
     std::vector<unsigned char> AuthTag;       // 16 bytes if encrypted
 };
 
+// Drop-in replacement for CEterPack that reads .vpk archives.
+// Integrates with CEterFileDict and CMappedFile exactly like CEterPack does.
 class CVpkPack
 {
 public:
     CVpkPack();
     virtual ~CVpkPack();
 
+    // Same signature as CEterPack::Create - called from CEterPackManager::RegisterPack
     bool Create(CEterFileDict& rkFileDict,
                 const char* dbname,
                 const char* pathName,
@@ -66,7 +76,12 @@ public:
 
     void SetPassphrase(const char* passphrase);
 
-    bool Get(CMappedFile& mappedFile, const char* filename, const void** data);
+    // Same signature as CEterPack::Get2 - called from CEterPackManager::GetFromPack
+    bool Get2(CMappedFile& mappedFile, const char* filename,
+              TEterPackIndex* index, LPCVOID* data);
+
+    // Convenience wrapper matching CEterPack::Get
+    bool Get(CMappedFile& mappedFile, const char* filename, LPCVOID* data);
 
     bool IsExist(const char* filename) const;
 
@@ -76,8 +91,6 @@ public:
     const std::string& GetPathName() const;
     const TVpkHeader& GetHeader() const;
 
-    bool ReadEntry(const TVpkEntry& entry, unsigned char** outData, int* outSize);
-
 private:
     bool ReadHeader();
     bool VerifyHmac();
@@ -85,14 +98,21 @@ private:
     bool DeriveKeys();
     void RegisterEntries(CEterFileDict& rkFileDict);
 
+    bool DecryptAndDecompress(const TVpkEntry& entry,
+                              unsigned char** outData, int* outSize);
+
     std::string m_dbName;
     std::string m_pathName;
-    std::string m_filePath;     // full path to the .vpk file
+    std::string m_filePath;
 
     TVpkHeader  m_header;
     std::vector<TVpkEntry> m_entries;
 
-    std::unordered_map<unsigned int, int> m_entryMap;
+    // CRC32 hash → entry index for fast lookup
+    std::unordered_map<DWORD, int> m_entryMap;
+
+    // Stub TEterPackIndex array - one per entry, used for CEterFileDict integration
+    TEterPackIndex* m_pIndexData;
 
     unsigned char m_aesKey[32];
     unsigned char m_hmacKey[32];
