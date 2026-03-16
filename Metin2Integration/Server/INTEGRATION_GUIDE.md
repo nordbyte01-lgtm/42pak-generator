@@ -1,89 +1,108 @@
-# Metin2 Server Integration Guide - 42pak VPK Format
+# 42pak VPK — Server Integration Guide
 
-This guide explains how to use VPK archives on the Metin2 game server for
-proto files, locale data, and other server-side resources.
+Based on analysis of the actual 40250 server source code at
+`Server/metin2_server+src/metin2/src/server/`.
 
-## Overview
+## Key Finding: The Server Does Not Use EterPack
 
-The game server typically reads these from the filesystem or legacy pak files:
-- `locale/XX/item_proto` - Item definitions
-- `locale/XX/mob_proto` - Monster definitions  
-- `locale/XX/item_names.txt`, `mob_names.txt` - Display names
-- Various config and script files
+The 40250 server has **zero** references to EterPack, `.eix`, or `.epk` files.
+All server file I/O uses plain `fopen()`/`fread()` or `std::ifstream`:
 
-With VPK, you can bundle these into encrypted, tamper-resistant archives.
+| Loader | Used By | Source File |
+|--------|---------|-------------|
+| `CTextFileLoader` | mob_manager, item_manager, DragonSoul, skill, refine | `game/src/text_file_loader.cpp` |
+| `CGroupTextParseTreeLoader` | item special groups, DragonSoul tables | `game/src/group_text_parse_tree.cpp` |
+| `cCsvTable` / `cCsvFile` | mob_proto.txt, item_proto.txt, *_names.txt | `db/src/CsvReader.cpp` |
+| Direct `fopen()` | CONFIG, map files, regen, locale, fishing, cube | Various |
 
-## Files to Add
+The server only references packs in one place: **`ClientPackageCryptInfo.cpp`**,
+which loads encryption keys from `package.dir/` and sends them to the **client**
+for decrypting `.epk` files. The server itself never opens pack files.
 
-Copy into your server source directory (e.g. `game/src/`):
+## Integration Options
 
-| File | Description |
-|------|-------------|
-| `VpkHandler.h` | CVpkHandler class declaration |
-| `VpkHandler.cpp` | Self-contained implementation (no EterPack dependency) |
+### Option A: Keep Server Files as Raw Files (Recommended)
 
-The server-side handler is fully self-contained - it includes its own crypto
-routines and does not depend on any client-side EterPack headers.
+Since the server already reads raw files from disk, the simplest approach is:
+- Keep all server data files (protos, configs, maps) as raw files
+- Use VPK only on the client side
+- Remove or update `ClientPackageCryptInfo` to not send EPK keys
+
+This is the recommended approach for most setups.
+
+### Option B: Bundle Server Data in VPK Archives
+
+If you want tamper-resistant, encrypted server data files, use `CVpkHandler`
+to read from VPK archives instead of raw files.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `VpkHandler.h` | Self-contained VPK reader (no EterPack dependency) |
+| `VpkHandler.cpp` | Full implementation with built-in crypto |
+
+The server handler is completely standalone — it includes its own AES-GCM,
+PBKDF2, HMAC-SHA256, BLAKE3, LZ4, Zstandard, and Brotli implementations
+inline. No dependency on any client-side EterPack code.
 
 ## Required Libraries
 
-Same as client-side:
-- **OpenSSL 1.1+** - `libssl`, `libcrypto`
-- **LZ4** - `liblz4`
-- **BLAKE3** - C reference implementation
-
-### Linux Build (typical server environment)
+### Linux (typical server)
 
 ```bash
-# Install dependencies
-sudo apt-get install libssl-dev liblz4-dev
+# Debian/Ubuntu
+sudo apt-get install libssl-dev liblz4-dev libzstd-dev libbrotli-dev
 
-# Clone BLAKE3 C reference
+# CentOS/RHEL
+sudo yum install openssl-devel lz4-devel libzstd-devel brotli-devel
+
+# FreeBSD
+pkg install openssl liblz4 zstd brotli
+```
+
+### BLAKE3
+
+```bash
 git clone https://github.com/BLAKE3-team/BLAKE3.git
 cp BLAKE3/c/blake3.h BLAKE3/c/blake3.c BLAKE3/c/blake3_dispatch.c \
    BLAKE3/c/blake3_portable.c game/src/
+```
 
-# Add to Makefile
+### Makefile additions
+
+```makefile
 CXXFLAGS += -I/usr/include/openssl
-LDFLAGS  += -lssl -lcrypto -llz4
+LDFLAGS  += -lssl -lcrypto -llz4 -lzstd -lbrotlidec -lbrotlicommon
 SOURCES  += VpkHandler.cpp blake3.c blake3_dispatch.c blake3_portable.c
 ```
 
-### FreeBSD Build
+## Integration Examples
 
-```bash
-pkg install openssl liblz4
-# Same BLAKE3 setup as Linux
-```
+### Example 1: Loading Proto Data from VPK
 
-## Integration Steps
+The DB server loads protos from CSV/binary files in `db/src/ClientManagerBoot.cpp`:
 
-### Step 1: Loading Proto Data from VPK
-
-Replace direct filesystem reads with VPK reads. Example for `item_proto`:
-
-**Before (existing code in `db/src/ProtoReader.cpp` or similar):**
+**Before (raw file):**
 ```cpp
 FILE* fp = fopen("locale/en/item_proto", "rb");
 fread(itemData, sizeof(TItemTable), count, fp);
 fclose(fp);
 ```
 
-**After (VPK integration):**
+**After (VPK):**
 ```cpp
 #include "VpkHandler.h"
 
-// At server startup, open the locale VPK
 static CVpkHandler g_localeVpk;
 
-bool LoadLocaleVpk(const char* locale)
+bool InitLocaleVpk(const char* locale, const char* passphrase)
 {
     char path[256];
     snprintf(path, sizeof(path), "pack/locale_%s.vpk", locale);
-    return g_localeVpk.Open(path, "your-server-passphrase");
+    return g_localeVpk.Open(path, passphrase);
 }
 
-// In the proto loading function:
 bool LoadItemProto()
 {
     std::vector<unsigned char> data;
@@ -95,114 +114,124 @@ bool LoadItemProto()
 
     int count = data.size() / sizeof(TItemTable);
     const TItemTable* items = reinterpret_cast<const TItemTable*>(data.data());
-
-    for (int i = 0; i < count; ++i)
-        // process items[i]...
-
+    // process items...
     return true;
 }
 ```
 
-### Step 2: Admin Validation Tool
+### Example 2: Reading Text Files from VPK
 
-Add a simple validation command to verify VPK integrity:
+For `CTextFileLoader`-style files (mob_group.txt, etc.):
 
 ```cpp
-// In your admin command handler:
+bool LoadMobGroups()
+{
+    std::string content;
+    if (!g_localeVpk.ReadFileAsString("locale/en/mob_group.txt", content))
+    {
+        sys_err("Failed to read mob_group.txt from VPK");
+        return false;
+    }
+
+    CMemoryTextFileLoader loader;
+    loader.Bind(content.size(), content.c_str());
+    // parse as before...
+    return true;
+}
+```
+
+### Example 3: Updating ClientPackageCryptInfo
+
+The 40250 server sends EPK encryption keys to the client via
+`game/src/ClientPackageCryptInfo.cpp` and `game/src/panama.cpp`.
+
+When using VPK, you have two options:
+
+**Option A: Remove pack key sending entirely**
+If all packs are converted to VPK, the client no longer needs server-sent
+EPK keys. Remove or disable `LoadClientPackageCryptInfo()` and `PanamaLoad()`
+from the boot sequence in `game/src/main.cpp`.
+
+**Option B: Keep hybrid support**
+If some packs remain as EPK while others are VPK, keep the existing
+key-sending code for EPK packs. VPK packs use their own passphrase
+mechanism and don't need server-sent keys.
+
+### Example 4: Admin Commands
+
+```cpp
 ACMD(do_vpk_validate)
 {
-    const char* vpkPath = argument; // e.g. "pack/locale_en.vpk"
+    char arg1[256];
+    one_argument(argument, arg1, sizeof(arg1));
+
+    if (!*arg1)
+    {
+        ch->ChatPacket(CHAT_TYPE_INFO, "Usage: /vpk_validate <path>");
+        return;
+    }
 
     CVpkHandler handler;
-    if (!handler.Open(vpkPath, g_serverPassphrase))
+    if (!handler.Open(arg1, g_vpkPassphrase.c_str()))
     {
-        ch->ChatPacket(CHAT_TYPE_INFO, "Failed to open VPK: %s", vpkPath);
+        ch->ChatPacket(CHAT_TYPE_INFO, "Failed to open: %s", arg1);
         return;
     }
 
     auto result = handler.Validate();
-    ch->ChatPacket(CHAT_TYPE_INFO, "VPK: %d/%d files valid, %d errors",
-                   result.ValidEntries, result.TotalEntries,
+    ch->ChatPacket(CHAT_TYPE_INFO, "VPK %s: %d/%d valid, %d errors",
+                   arg1, result.ValidEntries, result.TotalEntries,
                    (int)result.Errors.size());
-
-    for (const auto& err : result.Errors)
-        ch->ChatPacket(CHAT_TYPE_INFO, "  Error: %s", err.c_str());
 }
 ```
 
-### Step 3: File Listing for Debug
+## Passphrase Management
+
+On the server, store the VPK passphrase securely:
+
+```bash
+# conf/vpk.conf (chmod 600)
+VPK_PASSPHRASE=your-strong-passphrase-here
+```
 
 ```cpp
-ACMD(do_vpk_list)
+std::string LoadVpkPassphrase()
 {
-    CVpkHandler handler;
-    if (!handler.Open(argument, g_serverPassphrase))
-        return;
-
-    handler.ForEachEntry([&](const char* name, long long size, bool compressed, bool encrypted)
+    std::ifstream f("conf/vpk.conf");
+    std::string line;
+    while (std::getline(f, line))
     {
-        ch->ChatPacket(CHAT_TYPE_INFO, "  %s (%lld bytes, %s%s)",
-                       name, size,
-                       compressed ? "LZ4" : "raw",
-                       encrypted ? "+AES" : "");
-    });
+        if (line.compare(0, 15, "VPK_PASSPHRASE=") == 0)
+            return line.substr(15);
+    }
+    return "";
 }
 ```
 
-## Security Considerations
+## Compression Support
 
-### Passphrase Management
+The server handler supports all three compression algorithms:
 
-On the server, the VPK passphrase should be:
+| Algorithm | ID | Library | Speed | Ratio |
+|-----------|----|---------|-------|-------|
+| LZ4 | 1 | liblz4 | Fastest | Good |
+| Zstandard | 2 | libzstd | Fast | Better |
+| Brotli | 3 | libbrotli | Slower | Best |
 
-1. **Stored in a config file** with restricted permissions:
-   ```bash
-   chmod 600 /usr/metin2/conf/vpk.conf
-   ```
-   ```
-   # vpk.conf
-   VPK_PASSPHRASE=your-strong-passphrase-here
-   ```
-
-2. **Loaded at startup** and not logged:
-   ```cpp
-   std::string LoadVpkPassphrase()
-   {
-       std::ifstream f("conf/vpk.conf");
-       std::string line;
-       while (std::getline(f, line))
-       {
-           if (line.substr(0, 15) == "VPK_PASSPHRASE=")
-               return line.substr(15);
-       }
-       return "";
-   }
-   ```
-
-3. **Never hardcoded** in server source (unlike the client, where some
-   obfuscation is acceptable for anti-cheat purposes).
-
-### Tamper Detection
-
-The HMAC-SHA256 at the end of each VPK file ensures:
-- Modifications to any file content are detected
-- Added or removed entries are detected
-- Header tampering is detected
-
-If `Open()` returns false for an encrypted VPK, the archive may have been
-tampered with or the passphrase is wrong.
+The algorithm is stored in the VPK header and detected automatically.
+No configuration needed on the reading side.
 
 ## Directory Layout
 
 ```
 /usr/metin2/
 ├── conf/
-│   └── vpk.conf            ← passphrase config
+│   └── vpk.conf             ← passphrase (chmod 600)
 ├── pack/
-│   ├── locale_en.vpk       ← locale data
+│   ├── locale_en.vpk        ← locale data
 │   ├── locale_de.vpk
-│   ├── proto.vpk            ← item/mob proto tables
-│   └── scripts.vpk          ← quest scripts, configs
+│   ├── proto.vpk             ← item/mob proto tables
+│   └── scripts.vpk           ← quest scripts, configs
 └── game/
     └── src/
         ├── VpkHandler.h
@@ -216,4 +245,14 @@ tampered with or the passphrase is wrong.
 - Entry table is parsed once at `Open()` and cached in memory
 - For frequently accessed files, consider caching the `ReadFile()` output
 - BLAKE3 hash verification adds ~0.1ms per MB of data
+
+## Tamper Detection
+
+The HMAC-SHA256 at the end of each VPK file ensures:
+- Modifications to any file content are detected
+- Added or removed entries are detected
+- Header tampering is detected
+
+If `Open()` returns false for an encrypted VPK, the archive may have been
+tampered with or the passphrase is wrong.
 - LZ4 decompression adds ~0.5ms per MB of compressed data

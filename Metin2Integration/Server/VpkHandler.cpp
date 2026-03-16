@@ -10,6 +10,8 @@
 #include "blake3.h"
 
 #include <lz4.h>
+#include <zstd.h>
+#include <brotli/decode.h>
 
 struct TVpkHeader
 {
@@ -360,19 +362,45 @@ bool CVpkHandler::DecryptAndDecompress(const TVpkEntry& entry,
 
     if (entry.IsCompressed)
     {
-        if (m_pHeader->CompressionAlgorithm != 1) // only LZ4 supported in C++ handler
-            return false;
-
         int origSize = *reinterpret_cast<const int*>(current);
         if (origSize != static_cast<int>(entry.OriginalSize))
             return false;
 
         outData.resize(origSize);
-        int result = LZ4_decompress_safe(
-            reinterpret_cast<const char*>(current + 4),
-            reinterpret_cast<char*>(outData.data()),
-            currentSize - 4,
-            origSize);
+
+        const unsigned char* compData = current + 4;
+        int compSize = currentSize - 4;
+        int result = -1;
+
+        switch (m_pHeader->CompressionAlgorithm)
+        {
+        case 1: // LZ4
+            result = LZ4_decompress_safe(
+                reinterpret_cast<const char*>(compData),
+                reinterpret_cast<char*>(outData.data()),
+                compSize, origSize);
+            break;
+
+        case 2: // Zstandard
+        {
+            size_t zr = ZSTD_decompress(outData.data(), static_cast<size_t>(origSize),
+                                         compData, static_cast<size_t>(compSize));
+            result = ZSTD_isError(zr) ? -1 : static_cast<int>(zr);
+            break;
+        }
+
+        case 3: // Brotli
+        {
+            size_t outSz = static_cast<size_t>(origSize);
+            BrotliDecoderResult br = BrotliDecoderDecompress(
+                static_cast<size_t>(compSize), compData, &outSz, outData.data());
+            result = (br == BROTLI_DECODER_RESULT_SUCCESS) ? static_cast<int>(outSz) : -1;
+            break;
+        }
+
+        default:
+            return false;
+        }
 
         if (result <= 0) return false;
         current = outData.data();
