@@ -8,8 +8,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>FortyTwoPak.UI</RootNamespace>
     <AssemblyName>FortyTwoPak</AssemblyName>
-    <ApplicationIcon>..\..\p42.ico</ApplicationIcon>
-  </PropertyGroup>
+    <ApplicationIcon>..\..\p42.ico</ApplicationIcon>    <OutputPath>..\..\build</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>  </PropertyGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="..\..\p42.ico" LogicalName="p42.ico" />
