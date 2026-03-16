@@ -1,4 +1,8 @@
-# VPK Binary Format Specification — Version 1
+<p align="center">
+  <img src="../assets/custom-pak-tool-banner.jpg" alt="42pak-generator" width="100%" />
+</p>
+
+# VPK Binary Format Specification - Version 1
 
 This document describes the `.vpk` file format used by 42pak-generator.
 
@@ -157,5 +161,5 @@ The 4-byte prefix allows the decompressor to allocate the correct output buffer 
 
 - Format version 1 is the initial release
 - Readers should reject archives with `Version > 1` (no forward compatibility)
-- The `Reserved` padding in the header is for future use — must be zero in v1
+- The `Reserved` padding in the header is for future use - must be zero in v1
 - Software that only reads unencrypted VPKs can skip all crypto operations

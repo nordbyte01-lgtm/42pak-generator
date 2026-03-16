@@ -1,6 +1,10 @@
-# 42pak VPK — Client Integration Guide (40250 / ClientVS22)
+<p align="center">
+  <img src="../../../assets/custom-pak-tool-banner.jpg" alt="42pak-generator" width="100%" />
+</p>
 
-> **Profile:** 40250 — targets the multi-cipher HybridCrypt architecture.
+# 42pak VPK - Client Integration Guide (40250 / ClientVS22)
+
+> **Profile:** 40250 - targets the multi-cipher HybridCrypt architecture.
 > For FliegeV3 (XTEA/LZ4) integration, see `../FliegeV3/INTEGRATION_GUIDE.md`.
 
 Drop-in replacement for the EterPack (EIX/EPK) system. Based on the actual
@@ -18,7 +22,7 @@ Drop-in replacement for the EterPack (EIX/EPK) system. Based on the actual
 
 ## Architecture
 
-VPK integrates via `CEterFileDict` — the same hash lookup the original
+VPK integrates via `CEterFileDict` - the same hash lookup the original
 EterPack uses. When `CEterPackManager::RegisterPackAuto()` finds a `.vpk`
 file, it creates a `CVpkPack` instead of `CEterPack`. The `CVpkPack`
 registers its entries into the shared `m_FileDict` with a sentinel marker.
@@ -39,7 +43,7 @@ CEterPackManager::Get()
 
 | File | Purpose |
 |------|---------|
-| `VpkLoader.h` | `CVpkPack` class — drop-in replacement for `CEterPack` |
+| `VpkLoader.h` | `CVpkPack` class - drop-in replacement for `CEterPack` |
 | `VpkLoader.cpp` | Full implementation: header parsing, entry table, decrypt+decompress, BLAKE3 verify |
 | `VpkCrypto.h` | Crypto utilities: AES-GCM, PBKDF2, HMAC-SHA256, BLAKE3, LZ4/Zstd/Brotli |
 | `VpkCrypto.cpp` | Implementations using OpenSSL + BLAKE3 + LZ4 + Zstd + Brotli |
@@ -148,7 +152,7 @@ That's it. Two changes total:
 ### Step 4: Build
 
 Build the EterPack project first, then the full solution. The VPK code compiles
-alongside the existing EterPack code — nothing is removed.
+alongside the existing EterPack code - nothing is removed.
 
 ## How It Works
 
@@ -200,7 +204,7 @@ GetFromPack()
 
 ### Memory Management
 
-CVpkPack uses `CMappedFile::AppendDataBlock()` — the same mechanism that
+CVpkPack uses `CMappedFile::AppendDataBlock()` - the same mechanism that
 CEterPack uses for HybridCrypt data. The decompressed data is copied into
 a CMappedFile-owned buffer that is automatically freed when the CMappedFile
 goes out of scope. No manual cleanup needed.
@@ -227,14 +231,14 @@ Or use the GUI's Create view to build VPK archives from folders.
 
 ## Migration Strategy
 
-1. **Set up libraries** — add OpenSSL, LZ4, Zstd, Brotli, BLAKE3 to your project
-2. **Add VPK files** — copy the 6 new source files into `source/EterPack/`
-3. **Patch EterPackManager** — merge or replace the header and implementation
-4. **Patch UserInterface.cpp** — the 2-line change
-5. **Build** — verify everything compiles
-6. **Convert one pack** — e.g. `metin2_patch_etc` → test it loads correctly
-7. **Convert remaining packs** — one at a time or all at once
-8. **Remove old EPK files** — once all packs are converted
+1. **Set up libraries** - add OpenSSL, LZ4, Zstd, Brotli, BLAKE3 to your project
+2. **Add VPK files** - copy the 6 new source files into `source/EterPack/`
+3. **Patch EterPackManager** - merge or replace the header and implementation
+4. **Patch UserInterface.cpp** - the 2-line change
+5. **Build** - verify everything compiles
+6. **Convert one pack** - e.g. `metin2_patch_etc` -> test it loads correctly
+7. **Convert remaining packs** - one at a time or all at once
+8. **Remove old EPK files** - once all packs are converted
 
 Since `RegisterPackAuto` falls back to EPK when no VPK exists, you can
 convert packs incrementally without breaking anything.
@@ -245,7 +249,7 @@ convert packs incrementally without breaking anything.
 |--------|-------------|
 | Hardcoded in source | Private servers, simplest approach |
 | Config file (`metin2.cfg`) | Easy to change without recompiling |
-| Server-sent at login | Maximum security — passphrase changes per session |
+| Server-sent at login | Maximum security - passphrase changes per session |
 
 For server-sent passphrase, modify `CAccountConnector` to receive it
 in the auth response and call `CEterPackManager::Instance().SetVpkPassphrase()`
@@ -255,7 +259,7 @@ before any pack access occurs.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Pack files not found | `.vpk` extension missing | Ensure pack name doesn't include extension — `RegisterPackAuto` appends `.vpk` |
+| Pack files not found | `.vpk` extension missing | Ensure pack name doesn't include extension - `RegisterPackAuto` appends `.vpk` |
 | "HMAC verification failed" | Wrong passphrase | Check `SetVpkPassphrase` is called before `RegisterPackAuto` |
 | Files not found in VPK | Path case mismatch | VPK normalizes to lowercase with `/` separators |
 | Crash in `Get2()` | `compressed_type` sentinel collision | Ensure no EPK files use `compressed_type == -1` (none do in standard Metin2) |

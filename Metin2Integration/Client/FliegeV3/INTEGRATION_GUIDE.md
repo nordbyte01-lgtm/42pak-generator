@@ -1,4 +1,8 @@
-# 42pak VPK — FliegeV3 Client Integration Guide
+<p align="center">
+  <img src="../../../assets/custom-pak-tool-banner.jpg" alt="42pak-generator" width="100%" />
+</p>
+
+# 42pak VPK - FliegeV3 Client Integration Guide
 
 Drop-in replacement for the EterPack (EIX/EPK) system. Based on the actual
 FliegeV3 binary-src client source code. All file paths reference the real
@@ -15,7 +19,7 @@ FliegeV3 source tree.
 | Key management | Static hardcoded XTEA keys | PBKDF2-SHA512 passphrase |
 | Index entries | 192-byte `TEterPackIndex` | Variable-length VPK entries |
 
-## FliegeV3 vs 40250 — Why a Separate Profile?
+## FliegeV3 vs 40250 - Why a Separate Profile?
 
 FliegeV3 differs significantly from the 40250 system:
 
@@ -33,7 +37,7 @@ same API surface (`RegisterVpkPack`, `RegisterPackAuto`, `SetVpkPassphrase`).
 
 ## Architecture
 
-VPK integrates via `CEterFileDict` — the same `boost::unordered_multimap`
+VPK integrates via `CEterFileDict` - the same `boost::unordered_multimap`
 lookup that the original FliegeV3 EterPack uses. When `RegisterPackAuto()`
 finds a `.vpk` file, it creates a `CVpkPack` instead of `CEterPack`. The
 `CVpkPack` registers its entries into the shared `m_FileDict` with a
@@ -56,12 +60,12 @@ CEterPackManager::Get()
 
 | File | Purpose |
 |------|---------|
-| `VpkLoader.h` | `CVpkPack` class — drop-in replacement for `CEterPack` |
+| `VpkLoader.h` | `CVpkPack` class - drop-in replacement for `CEterPack` |
 | `VpkLoader.cpp` | Full implementation: header parsing, entry table, decrypt+decompress, BLAKE3 verify |
 | `VpkCrypto.h` | Crypto utilities: AES-GCM, PBKDF2, HMAC-SHA256, BLAKE3, LZ4/Zstd/Brotli |
 | `VpkCrypto.cpp` | Implementations using OpenSSL + BLAKE3 + LZ4 + Zstd + Brotli |
 | `EterPackManager_Vpk.h` | Patched `CEterPackManager` header with VPK support |
-| `EterPackManager_Vpk.cpp` | Patched `CEterPackManager` — no HybridCrypt, FliegeV3 search logic |
+| `EterPackManager_Vpk.cpp` | Patched `CEterPackManager` - no HybridCrypt, FliegeV3 search logic |
 
 ### Files to modify
 
@@ -142,7 +146,7 @@ Add these to the existing `EterPackManager.h`:
 Then merge the implementations from `EterPackManager_Vpk.cpp` into your existing `.cpp`.
 
 **Important:** Do NOT add `DecryptPackIV`, `WriteHybridCryptPackInfo`,
-`RetrieveHybridCryptPackKeys`, or `RetrieveHybridCryptPackSDB` — FliegeV3
+`RetrieveHybridCryptPackKeys`, or `RetrieveHybridCryptPackSDB` - FliegeV3
 does not have these methods.
 
 ### Step 3: Patch UserInterface.cpp
@@ -177,11 +181,11 @@ to networking code. There are no `RetrieveHybridCryptPackKeys` or
 ### Step 4: Build
 
 Build the EterPack project first, then the full solution. The VPK code compiles
-alongside the existing EterPack code — nothing is removed.
+alongside the existing EterPack code - nothing is removed.
 
 **FliegeV3-specific build notes:**
 - FliegeV3 uses Boost. The `boost::unordered_multimap` in `CEterFileDict` is
-  compatible with VPK — `InsertItem()` works identically.
+  compatible with VPK - `InsertItem()` works identically.
 - Ensure `StdAfx.h` in EterPack includes `<boost/unordered_map.hpp>` (it should
   already if the FliegeV3 project compiles).
 - If you see linker errors about `boost::unordered_multimap`, verify Boost
@@ -236,7 +240,7 @@ GetFromPack()
 
 ### Memory Management
 
-CVpkPack uses `CMappedFile::AppendDataBlock()` — the same mechanism that
+CVpkPack uses `CMappedFile::AppendDataBlock()` - the same mechanism that
 CEterPack uses. The decompressed data is copied into a CMappedFile-owned
 buffer that is automatically freed when the CMappedFile goes out of scope.
 
@@ -245,10 +249,10 @@ buffer that is automatically freed when the CMappedFile goes out of scope.
 Use the 42pak-generator tool to convert your existing FliegeV3 pack files:
 
 ```
-# CLI — convert a single EPK pair to VPK
+# CLI - convert a single EPK pair to VPK
 42pak-generator.exe convert --source metin2_patch_etc.eix --passphrase "your-secret"
 
-# CLI — build a VPK from a folder
+# CLI - build a VPK from a folder
 42pak-generator.exe build --source ./ymir_work/item/ --output pack/item.vpk \
     --passphrase "your-secret" --algorithm lz4 --compression 6
 ```
@@ -257,14 +261,14 @@ Or use the GUI's Create view to build VPK archives from folders.
 
 ## Migration Strategy
 
-1. **Set up libraries** — add OpenSSL, Zstd, Brotli, BLAKE3 to your project (LZ4 likely already present)
-2. **Add VPK files** — copy the 6 new source files into `source/EterPack/`
-3. **Patch EterPackManager** — merge or replace the header and implementation
-4. **Patch UserInterface.cpp** — the 2-line change
-5. **Build** — verify everything compiles
-6. **Convert one pack** — e.g. `metin2_patch_etc` → test it loads correctly
-7. **Convert remaining packs** — one at a time or all at once
-8. **Remove old EPK files** — once all packs are converted
+1. **Set up libraries** - add OpenSSL, Zstd, Brotli, BLAKE3 to your project (LZ4 likely already present)
+2. **Add VPK files** - copy the 6 new source files into `source/EterPack/`
+3. **Patch EterPackManager** - merge or replace the header and implementation
+4. **Patch UserInterface.cpp** - the 2-line change
+5. **Build** - verify everything compiles
+6. **Convert one pack** - e.g. `metin2_patch_etc` -> test it loads correctly
+7. **Convert remaining packs** - one at a time or all at once
+8. **Remove old EPK files** - once all packs are converted
 
 Since `RegisterPackAuto` falls back to EPK when no VPK exists, you can
 convert packs incrementally without breaking anything.
@@ -275,7 +279,7 @@ convert packs incrementally without breaking anything.
 |--------|-------------|
 | Hardcoded in source | Private servers, simplest approach |
 | Config file (`metin2.cfg`) | Easy to change without recompiling |
-| Server-sent at login | Maximum security — passphrase changes per session |
+| Server-sent at login | Maximum security - passphrase changes per session |
 
 For server-sent passphrase, modify `CAccountConnector` to receive it
 in the auth response and call `CEterPackManager::Instance().SetVpkPassphrase()`
@@ -285,11 +289,11 @@ before any pack access occurs.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Pack files not found | `.vpk` extension missing | Ensure pack name doesn't include extension — `RegisterPackAuto` appends `.vpk` |
+| Pack files not found | `.vpk` extension missing | Ensure pack name doesn't include extension - `RegisterPackAuto` appends `.vpk` |
 | "HMAC verification failed" | Wrong passphrase | Check `SetVpkPassphrase` is called before `RegisterPackAuto` |
 | Files not found in VPK | Path case mismatch | VPK normalizes to lowercase with `/` separators |
 | Crash in `Get2()` | `compressed_type` sentinel collision | Ensure no EPK files use `compressed_type == -1` (none do in standard Metin2) |
 | LZ4/Zstd/Brotli link error | Missing library | Add the decompression lib to Additional Dependencies |
 | BLAKE3 compile error | Missing source files | Ensure all `blake3_*.c` files are in the project |
 | Boost linker errors | Missing Boost includes | Verify Boost include paths in EterPack project properties |
-| `ENABLE_LOCAL_FILE_LOADING` issues | Loose files not found in release | Define the macro in debug builds only — matches FliegeV3 convention |
+| `ENABLE_LOCAL_FILE_LOADING` issues | Loose files not found in release | Define the macro in debug builds only - matches FliegeV3 convention |

@@ -1,4 +1,8 @@
-# 42pak VPK — Server Integration Guide
+<p align="center">
+  <img src="../../assets/custom-pak-tool-banner.jpg" alt="42pak-generator" width="100%" />
+</p>
+
+# 42pak VPK - Server Integration Guide
 
 Based on analysis of the actual 40250 server source code at
 `Server/metin2_server+src/metin2/src/server/`.
@@ -42,7 +46,7 @@ to read from VPK archives instead of raw files.
 | `VpkHandler.h` | Self-contained VPK reader (no EterPack dependency) |
 | `VpkHandler.cpp` | Full implementation with built-in crypto |
 
-The server handler is completely standalone — it includes its own AES-GCM,
+The server handler is completely standalone - it includes its own AES-GCM,
 PBKDF2, HMAC-SHA256, BLAKE3, LZ4, Zstandard, and Brotli implementations
 inline. No dependency on any client-side EterPack code.
 

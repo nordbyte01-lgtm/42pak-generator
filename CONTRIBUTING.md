@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/custom-pak-tool-banner.jpg" alt="42pak-generator" width="100%" />
+</p>
+
 # Contributing to 42pak-generator
 
 Thank you for your interest in contributing! This guide will help you get started.

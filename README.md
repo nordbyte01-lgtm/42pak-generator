@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/custom-pak-tool-banner.jpg" alt="42pak-generator" width="100%" />
+</p>
+
 # 42pak-generator
 
 A modern, open-source pak file manager for the Metin2 private server community. Replaces the legacy EIX/EPK archive format with the new **VPK** format featuring AES-256-GCM encryption, LZ4/Zstandard/Brotli compression, BLAKE3 hashing, and HMAC-SHA256 tamper detection.
@@ -6,17 +10,22 @@ A modern, open-source pak file manager for the Metin2 private server community. 
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Platform](https://img.shields.io/badge/Platform-Windows-blue)
 
+> **Screenshots:** See [PREVIEW.md](PREVIEW.md) for a full gallery of the GUI in both dark and light themes.
+
+---
+
 ## Features
 
 - **Create VPK archives** - Pack directories into single `.vpk` files with optional encryption and compression
 - **Manage existing archives** - Browse, search, extract, and validate VPK archives
-- **Convert EIX/EPK → VPK** - One-click migration from legacy EterPack format
+- **Convert EIX/EPK to VPK** - One-click migration from legacy EterPack format (supports both 40250 and FliegeV3 variants)
 - **AES-256-GCM encryption** - Per-file authenticated encryption with unique nonces
 - **LZ4 / Zstandard / Brotli compression** - Choose the algorithm that fits your needs
 - **BLAKE3 content hashing** - Cryptographic integrity verification for every file
 - **HMAC-SHA256** - Archive-level tamper detection
 - **Filename mangling** - Optional obfuscation of file paths within archives
-- **Metin2 C++ integration** - Drop-in client and server loader code included
+- **Full CLI** - Standalone `42pak-cli` with pack, unpack, list, info, verify, diff, migrate, search, check-duplicates, and watch commands
+- **Metin2 C++ integration** - Drop-in client and server loader code for both 40250 and FliegeV3 source trees
 
 ## VPK vs EIX/EPK Comparison
 
@@ -30,6 +39,8 @@ A modern, open-source pak file manager for the Metin2 private server community. 
 | Filename length | 160 bytes | 512 bytes (UTF-8) |
 | Key derivation | Hardcoded keys | PBKDF2-SHA512 (200k iterations) |
 | Tamper detection | None | HMAC-SHA256 whole-archive |
+
+---
 
 ## Quick Start
 
@@ -47,10 +58,16 @@ dotnet restore
 dotnet build --configuration Release
 ```
 
-### Run
+### Run the GUI
 
 ```bash
 dotnet run --project src/FortyTwoPak.UI
+```
+
+### Run the CLI
+
+```bash
+dotnet run --project src/FortyTwoPak.CLI -- <command> [options]
 ```
 
 ### Run Tests
@@ -59,73 +76,117 @@ dotnet run --project src/FortyTwoPak.UI
 dotnet test
 ```
 
+### Publish (Portable / Installer)
+
+```powershell
+# CLI single-exe (~65 MB)
+.\publish.ps1 -Target CLI
+
+# GUI portable folder (~163 MB)
+.\publish.ps1 -Target GUI
+
+# Both + Inno Setup installer
+.\publish.ps1 -Target All
+```
+
+---
+
+## CLI Usage
+
+The standalone CLI (`42pak-cli`) supports all operations:
+
+```
+42pak-cli pack <SOURCE_DIR> [--output <FILE>] [--compression <lz4|zstd|brotli|none>] [--level <N>] [--passphrase <PASS>] [--threads <N>] [--dry-run]
+42pak-cli unpack <ARCHIVE> <OUTPUT_DIR> [--passphrase <PASS>] [--filter <PATTERN>]
+42pak-cli list <ARCHIVE> [--passphrase <PASS>] [--filter <PATTERN>] [--json]
+42pak-cli info <ARCHIVE> [--passphrase <PASS>] [--json]
+42pak-cli verify <ARCHIVE> [--passphrase <PASS>] [--filter <PATTERN>] [--json]
+42pak-cli diff <ARCHIVE_A> <ARCHIVE_B> [--passphrase <PASS>] [--json]
+42pak-cli migrate <LEGACY_ARCHIVE> [--output <FILE>] [--compression <TYPE>] [--passphrase <PASS>]
+42pak-cli search <WORKSPACE_DIR> <FILENAME_OR_PATTERN>
+42pak-cli check-duplicates <WORKSPACE_DIR> [--read-index]
+42pak-cli watch <SOURCE_DIR> [--output <FILE>] [--debounce <MS>]
+```
+
+**Flags:** `-q` / `--quiet` suppresses all output except errors. `--json` outputs structured JSON for scriptable pipelines.
+
+**Exit codes:** 0 = success, 1 = error, 2 = integrity failure, 3 = passphrase incorrect.
+
+---
+
 ## Project Structure
 
 ```
 42pak-generator/
-├── 42pak-generator.sln              # Solution file
+├── 42pak-generator.sln
 ├── src/
-│   ├── FortyTwoPak.Core/            # Core library (format, crypto, compression)
+│   ├── FortyTwoPak.Core/            # Core library: VPK read/write, crypto, compression, legacy import
 │   │   ├── VpkFormat/               # VPK header, entry, archive classes
 │   │   ├── Crypto/                  # AES-GCM, PBKDF2, BLAKE3, HMAC
-│   │   ├── Compression/             # LZ4 compressor/decompressor
-│   │   ├── Legacy/                  # EIX/EPK reader and converter
-│   │   └── Utils/                   # File name mangling, progress reporting
+│   │   ├── Compression/             # LZ4 / Zstandard / Brotli compressors
+│   │   ├── Legacy/                  # EIX/EPK reader and converter (40250 + FliegeV3)
+│   │   ├── Cli/                     # Shared CLI handler (12 commands)
+│   │   └── Utils/                   # Filename mangling, progress reporting
+│   ├── FortyTwoPak.CLI/             # Standalone CLI tool (42pak-cli)
 │   ├── FortyTwoPak.UI/              # WebView2 desktop application
 │   │   ├── MainWindow.cs            # WinForms host with WebView2 control
-│   │   ├── BridgeService.cs         # JavaScript ↔ C# interop bridge
-│   │   └── wwwroot/                 # HTML/CSS/JS frontend
-│   │       ├── index.html            # Single-page app with 6 tabs
-│   │       ├── css/app.css           # Dark theme (Steam/Epic-inspired)
-│   │       └── js/app.js             # Tab navigation, wizard, file grid
-│   └── FortyTwoPak.Tests/           # xUnit test suite
+│   │   ├── BridgeService.cs         # JavaScript <-> C# interop bridge
+│   │   └── wwwroot/                 # HTML/CSS/JS frontend (6 tabs, dark/light theme)
+│   └── FortyTwoPak.Tests/           # xUnit test suite (22 tests)
 ├── Metin2Integration/
-│   ├── Client/                      # C++ files for metin2 game client
-│   │   ├── VpkLoader.h/cpp          # CVpkPack - replaces CEterPack
-│   │   ├── VpkCrypto.h/cpp          # Crypto utilities (OpenSSL + BLAKE3 + LZ4)
-│   │   └── INTEGRATION_GUIDE.md     # Step-by-step client integration
-│   └── Server/                      # C++ files for metin2 game server
-│       ├── VpkHandler.h/cpp         # CVpkHandler - server-side VPK reader
-│       └── INTEGRATION_GUIDE.md     # Server integration instructions
-└── docs/
-    └── FORMAT_SPEC.md               # VPK binary format specification
+│   ├── Client/
+│   │   ├── 40250/                   # C++ integration for 40250/ClientVS22 (HybridCrypt)
+│   │   └── FliegeV3/                # C++ integration for FliegeV3 (XTEA/LZ4)
+│   └── Server/                      # Shared server-side VPK handler
+├── docs/
+│   └── FORMAT_SPEC.md               # VPK binary format specification
+├── publish.ps1                      # Publish script (CLI/GUI/Installer/All)
+├── installer.iss                    # Inno Setup 6 installer script
+├── assets/                          # Screenshots and banner images
+└── build/                           # Build output
 ```
+
+---
 
 ## VPK File Format
 
 Single-file archive with this binary layout:
 
 ```
-┌─────────────────────────────────────┐
-│ VpkHeader (512 bytes, fixed)        │  Magic "42PK", version, entry count,
-│                                     │  encryption flag, salt, author, etc.
-├─────────────────────────────────────┤
-│ Data Block 0 (aligned to 4096)      │  File content (compressed + encrypted)
-├─────────────────────────────────────┤
-│ Data Block 1 (aligned to 4096)      │
-├─────────────────────────────────────┤
-│ ...                                 │
-├─────────────────────────────────────┤
-│ Entry Table (variable size)         │  Array of VpkEntry records. If encrypted,
-│                                     │  wrapped in AES-GCM (nonce + tag + data).
-├─────────────────────────────────────┤
-│ HMAC-SHA256 (32 bytes)              │  Covers everything above. Zero if unsigned.
-└─────────────────────────────────────┘
++-------------------------------------+
+| VpkHeader (512 bytes, fixed)        |  Magic "42PK", version, entry count,
+|                                     |  encryption flag, salt, author, etc.
++-------------------------------------+
+| Data Block 0 (aligned to 4096)      |  File content (compressed + encrypted)
++-------------------------------------+
+| Data Block 1 (aligned to 4096)      |
++-------------------------------------+
+| ...                                 |
++-------------------------------------+
+| Entry Table (variable size)         |  Array of VpkEntry records. If encrypted,
+|                                     |  wrapped in AES-GCM (nonce + tag + data).
++-------------------------------------+
+| HMAC-SHA256 (32 bytes)              |  Covers everything above. Zero if unsigned.
++-------------------------------------+
 ```
 
 ### Encryption Pipeline
 
-For each file: `Original → LZ4 Compress → AES-256-GCM Encrypt → Store`
+For each file: `Original -> LZ4 Compress -> AES-256-GCM Encrypt -> Store`
 
-On extraction: `Read → AES-256-GCM Decrypt → LZ4 Decompress → BLAKE3 Verify`
+On extraction: `Read -> AES-256-GCM Decrypt -> LZ4 Decompress -> BLAKE3 Verify`
 
-Key derivation: `PBKDF2-SHA512("42PK-v1:" + passphrase, salt, 100000 iterations) → 64 bytes`
+Key derivation: `PBKDF2-SHA512("42PK-v1:" + passphrase, salt, 100000 iterations) -> 64 bytes`
 - First 32 bytes: AES-256 key
 - Last 32 bytes: HMAC-SHA256 key
 
+For the full binary specification, see [docs/FORMAT_SPEC.md](docs/FORMAT_SPEC.md).
+
+---
+
 ## Usage
 
-### Creating a VPK Archive
+### Creating a VPK Archive (GUI)
 
 1. Open 42pak-generator
 2. Go to **Create Pak** tab
@@ -148,11 +209,16 @@ Key derivation: `PBKDF2-SHA512("42PK-v1:" + passphrase, salt, 100000 iterations)
 
 ### Metin2 Client Integration
 
-See [Metin2Integration/Client/INTEGRATION_GUIDE.md](Metin2Integration/Client/INTEGRATION_GUIDE.md) for detailed instructions on integrating VPK into the Metin2 game client.
+Two integration profiles are provided for different source trees:
+
+- **40250 / ClientVS22** (HybridCrypt, LZO): [Metin2Integration/Client/40250/INTEGRATION_GUIDE.md](Metin2Integration/Client/40250/INTEGRATION_GUIDE.md)
+- **FliegeV3** (XTEA, LZ4): [Metin2Integration/Client/FliegeV3/INTEGRATION_GUIDE.md](Metin2Integration/Client/FliegeV3/INTEGRATION_GUIDE.md)
 
 ### Metin2 Server Integration
 
-See [Metin2Integration/Server/INTEGRATION_GUIDE.md](Metin2Integration/Server/INTEGRATION_GUIDE.md) for server-side integration.
+See [Metin2Integration/Server/INTEGRATION_GUIDE.md](Metin2Integration/Server/INTEGRATION_GUIDE.md) for server-side VPK reading.
+
+---
 
 ## Technologies
 
@@ -168,6 +234,8 @@ See [Metin2Integration/Server/INTEGRATION_GUIDE.md](Metin2Integration/Server/INT
 | Tamper Detection | HMAC-SHA256 |
 | C++ Crypto | OpenSSL 1.1+ |
 | Testing | xUnit |
+
+---
 
 ## License
 
