@@ -2,6 +2,18 @@
   <img src="assets/custom-pak-tool-banner.jpg" alt="42pak-generator" width="100%" />
 </p>
 
+<p align="center">
+  <strong>🌐 Language / Język / Limbă / Dil / ภาษา / Idioma / Lingua / Idioma:</strong><br>
+  <a href="README.md">🇬🇧 English</a> •
+  <a href="README.pl.md">🇵🇱 Polski</a> •
+  <a href="README.ro.md">🇷🇴 Română</a> •
+  <a href="README.tr.md">🇹🇷 Türkçe</a> •
+  <a href="README.th.md">🇹🇭 ไทย</a> •
+  <a href="README.pt.md">🇧🇷 Português</a> •
+  <a href="README.it.md">🇮🇹 Italiano</a> •
+  <a href="README.es.md">🇪🇸 Español</a>
+</p>
+
 # 42pak-generator
 
 A modern, open-source pak file manager for the Metin2 private server community. Replaces the legacy EIX/EPK archive format with the new **VPK** format featuring AES-256-GCM encryption, LZ4/Zstandard/Brotli compression, BLAKE3 hashing, and HMAC-SHA256 tamper detection.
