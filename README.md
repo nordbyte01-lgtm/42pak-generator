@@ -265,3 +265,8 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - The original YMIR Entertainment EterPack format for providing the foundation
 - [BLAKE3 team](https://github.com/BLAKE3-team/BLAKE3) for the fast hash function
 - [K4os](https://github.com/MiloszKrajewski/K4os.Compression.LZ4) for the .NET LZ4 binding
+- **[MartySama](https://github.com/martysama0134)** - for his excellent tutorials and clean codebase
+- **Fliege** - for the inspiring server files and systems
+- **[TMP4](https://metin2.dev/profile/27454-tmp4/)** - for the high-quality reference files and tools
+
+Without their work, this project wouldn't have been possible. 🙏
