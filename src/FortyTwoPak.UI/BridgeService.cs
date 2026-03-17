@@ -156,6 +156,16 @@ public class BridgeService
                 options.EnableEncryption = true;
 
             var converter = new EixEpkConverter();
+
+            // Parse sourceFormat from JSON if provided
+            using var doc = JsonDocument.Parse(optionsJson);
+            if (doc.RootElement.TryGetProperty("sourceFormat", out var fmtEl))
+            {
+                var fmtStr = fmtEl.GetString();
+                if (!string.IsNullOrEmpty(fmtStr) && Enum.TryParse<EpkFormat>(fmtStr, true, out var fmt))
+                    converter.SourceFormat = fmt;
+            }
+
             var result = converter.Convert(eixPath, vpkOutputPath, options);
 
             return JsonSerializer.Serialize(new

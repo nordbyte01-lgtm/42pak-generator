@@ -30,14 +30,14 @@
 
 - **สร้างไฟล์เก็บถาวร VPK** — แพ็คไดเรกทอรีเป็นไฟล์ `.vpk` เดียวพร้อมการเข้ารหัสและการบีบอัดเสริม
 - **จัดการไฟล์เก็บถาวรที่มีอยู่** — เรียกดู ค้นหา แตกไฟล์ และตรวจสอบไฟล์เก็บถาวร VPK
-- **แปลง EIX/EPK เป็น VPK** — ย้ายจากรูปแบบ EterPack เดิมด้วยคลิกเดียว (รองรับทั้งรุ่น 40250 และ FliegeV3)
+- **แปลง EIX/EPK เป็น VPK** — ย้ายจากรูปแบบ EterPack เดิมด้วยคลิกเดียว (รองรับรุ่น 40250, FliegeV3 และ MartySama 5.8)
 - **การเข้ารหัส AES-256-GCM** — การเข้ารหัสแบบยืนยันตัวตนต่อไฟล์ด้วย nonce เฉพาะ
 - **การบีบอัด LZ4 / Zstandard / Brotli** — เลือกอัลกอริทึมที่เหมาะกับความต้องการ
 - **การแฮชเนื้อหา BLAKE3** — การตรวจสอบความสมบูรณ์เชิงการเข้ารหัสสำหรับทุกไฟล์
 - **HMAC-SHA256** — การตรวจจับการดัดแปลงระดับไฟล์เก็บถาวร
 - **การปิดบังชื่อไฟล์** — ตัวเลือกซ่อนเส้นทางไฟล์ภายในไฟล์เก็บถาวร
 - **CLI เต็มรูปแบบ** — เครื่องมือ `42pak-cli` แยกส่วนพร้อมคำสั่ง pack, unpack, list, info, verify, diff, migrate, search, check-duplicates และ watch
-- **การรวม C++ กับ Metin2** — โค้ดโหลดเดอร์สำเร็จรูปสำหรับไคลเอนต์และเซิร์ฟเวอร์สำหรับทั้งซอร์สทรี 40250 และ FliegeV3
+- **การรวม C++ กับ Metin2** — โค้ดโหลดเดอร์สำเร็จรูปสำหรับไคลเอนต์และเซิร์ฟเวอร์สำหรับซอร์สทรี 40250, FliegeV3 และ MartySama 5.8
 
 ## เปรียบเทียบ VPK กับ EIX/EPK
 
@@ -136,7 +136,7 @@ dotnet test
 │   │   ├── VpkFormat/               # เฮดเดอร์ รายการ คลาสไฟล์เก็บถาวร VPK
 │   │   ├── Crypto/                  # AES-GCM, PBKDF2, BLAKE3, HMAC
 │   │   ├── Compression/             # ตัวบีบอัด LZ4 / Zstandard / Brotli
-│   │   ├── Legacy/                  # ตัวอ่านและตัวแปลง EIX/EPK (40250 + FliegeV3)
+│   │   ├── Legacy/                  # ตัวอ่านและตัวแปลง EIX/EPK (40250 + FliegeV3 + MartySama 5.8)
 │   │   ├── Cli/                     # ตัวจัดการ CLI ที่ใช้ร่วม (12 คำสั่ง)
 │   │   └── Utils/                   # การปิดบังชื่อไฟล์ การรายงานความคืบหน้า
 │   ├── FortyTwoPak.CLI/             # เครื่องมือ CLI แยกส่วน (42pak-cli)
@@ -148,6 +148,7 @@ dotnet test
 ├── Metin2Integration/
 │   ├── Client/
 │   │   ├── 40250/                   # การรวม C++ สำหรับ 40250/ClientVS22 (HybridCrypt)
+│   │   ├── MartySama58/             # การรวม C++ สำหรับ MartySama 5.8 (Boost + HybridCrypt)
 │   │   └── FliegeV3/                # การรวม C++ สำหรับ FliegeV3 (XTEA/LZ4)
 │   └── Server/                      # ตัวจัดการ VPK ฝั่งเซิร์ฟเวอร์ที่ใช้ร่วม
 ├── docs/
@@ -221,9 +222,10 @@ dotnet test
 
 ### การรวมกับไคลเอนต์ Metin2
 
-มีโปรไฟล์การรวมสองแบบสำหรับซอร์สทรีที่แตกต่างกัน:
+มีโปรไฟล์การรวมสามแบบสำหรับซอร์สทรีที่แตกต่างกัน:
 
 - **40250 / ClientVS22** (HybridCrypt, LZO): [Metin2Integration/Client/40250/INTEGRATION_GUIDE.md](Metin2Integration/Client/40250/INTEGRATION_GUIDE.md)
+- **MartySama 5.8** (Boost, HybridCrypt, LZO): [Metin2Integration/Client/MartySama58/INTEGRATION_GUIDE.md](Metin2Integration/Client/MartySama58/INTEGRATION_GUIDE.md)
 - **FliegeV3** (XTEA, LZ4): [Metin2Integration/Client/FliegeV3/INTEGRATION_GUIDE.md](Metin2Integration/Client/FliegeV3/INTEGRATION_GUIDE.md)
 
 ### การรวมกับเซิร์ฟเวอร์ Metin2

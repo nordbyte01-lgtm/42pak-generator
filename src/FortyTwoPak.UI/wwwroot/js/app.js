@@ -373,7 +373,8 @@
     var opts = JSON.stringify({
       passphrase: $('#cv-enc').checked ? $('#cv-pass').value : null,
       enableEncryption: $('#cv-enc').checked,
-      compressionLevel: parseInt($('#c-comp').value, 10)
+      compressionLevel: parseInt($('#c-comp').value, 10),
+      sourceFormat: $('#cv-format').value
     });
 
     var btn = $('#btn-convert');

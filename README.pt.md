@@ -30,14 +30,14 @@ Um gerenciador de arquivos pak moderno e open-source para a comunidade de servid
 
 - **Criar arquivos VPK** — Empacotar diretórios em arquivos `.vpk` únicos com criptografia e compressão opcionais
 - **Gerenciar arquivos existentes** — Navegar, pesquisar, extrair e validar arquivos VPK
-- **Converter EIX/EPK para VPK** — Migração com um clique do formato legado EterPack (suporta variantes 40250 e FliegeV3)
+- **Converter EIX/EPK para VPK** — Migração com um clique do formato legado EterPack (suporta variantes 40250, FliegeV3 e MartySama 5.8)
 - **Criptografia AES-256-GCM** — Criptografia autenticada por arquivo com nonces únicos
 - **Compressão LZ4 / Zstandard / Brotli** — Escolha o algoritmo que melhor se adapta às suas necessidades
 - **Hash de conteúdo BLAKE3** — Verificação criptográfica de integridade para cada arquivo
 - **HMAC-SHA256** — Detecção de adulteração em nível de arquivo
 - **Ofuscação de nomes de arquivo** — Ocultação opcional dos caminhos de arquivo dentro dos arquivos
 - **CLI completo** — Ferramenta independente `42pak-cli` com comandos pack, unpack, list, info, verify, diff, migrate, search, check-duplicates e watch
-- **Integração C++ com Metin2** — Código loader drop-in para cliente e servidor para as árvores de código-fonte 40250 e FliegeV3
+- **Integração C++ com Metin2** — Código loader drop-in para cliente e servidor para as árvores de código-fonte 40250, FliegeV3 e MartySama 5.8
 
 ## Comparação VPK vs EIX/EPK
 
@@ -136,7 +136,7 @@ O CLI independente (`42pak-cli`) suporta todas as operações:
 │   │   ├── VpkFormat/               # Cabeçalho, entrada, classes de arquivo VPK
 │   │   ├── Crypto/                  # AES-GCM, PBKDF2, BLAKE3, HMAC
 │   │   ├── Compression/             # Compressores LZ4 / Zstandard / Brotli
-│   │   ├── Legacy/                  # Leitor e conversor EIX/EPK (40250 + FliegeV3)
+│   │   ├── Legacy/                  # Leitor e conversor EIX/EPK (40250 + FliegeV3 + MartySama 5.8)
 │   │   ├── Cli/                     # Handler CLI compartilhado (12 comandos)
 │   │   └── Utils/                   # Ofuscação de nomes, relatório de progresso
 │   ├── FortyTwoPak.CLI/             # Ferramenta CLI independente (42pak-cli)
@@ -148,6 +148,7 @@ O CLI independente (`42pak-cli`) suporta todas as operações:
 ├── Metin2Integration/
 │   ├── Client/
 │   │   ├── 40250/                   # Integração C++ para 40250/ClientVS22 (HybridCrypt)
+│   │   ├── MartySama58/             # Integração C++ para MartySama 5.8 (Boost + HybridCrypt)
 │   │   └── FliegeV3/                # Integração C++ para FliegeV3 (XTEA/LZ4)
 │   └── Server/                      # Handler VPK compartilhado do lado servidor
 ├── docs/
@@ -221,9 +222,10 @@ Para a especificação binária completa, veja [docs/FORMAT_SPEC.md](docs/FORMAT
 
 ### Integração com Cliente Metin2
 
-Dois perfis de integração são fornecidos para diferentes árvores de código-fonte:
+Três perfis de integração são fornecidos para diferentes árvores de código-fonte:
 
 - **40250 / ClientVS22** (HybridCrypt, LZO): [Metin2Integration/Client/40250/INTEGRATION_GUIDE.md](Metin2Integration/Client/40250/INTEGRATION_GUIDE.md)
+- **MartySama 5.8** (Boost, HybridCrypt, LZO): [Metin2Integration/Client/MartySama58/INTEGRATION_GUIDE.md](Metin2Integration/Client/MartySama58/INTEGRATION_GUIDE.md)
 - **FliegeV3** (XTEA, LZ4): [Metin2Integration/Client/FliegeV3/INTEGRATION_GUIDE.md](Metin2Integration/Client/FliegeV3/INTEGRATION_GUIDE.md)
 
 ### Integração com Servidor Metin2

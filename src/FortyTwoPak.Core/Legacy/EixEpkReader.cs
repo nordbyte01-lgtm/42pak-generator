@@ -8,12 +8,14 @@ namespace FortyTwoPak.Core.Legacy;
 /// </summary>
 public enum EpkFormat
 {
-    /// <summary>Auto-detect: try LZ4 first (FliegeV3), fall back to LZO (40250).</summary>
+    /// <summary>Auto-detect: try LZ4 first (FliegeV3), fall back to LZO (40250/MartySama).</summary>
     Auto,
     /// <summary>40250 system: LZO compression inside MCOZ headers.</summary>
     Standard,
     /// <summary>FliegeV3 system: LZ4 compression inside MCOZ headers.</summary>
-    FliegeV3
+    FliegeV3,
+    /// <summary>MartySama 5.8 system: LZO compression (same as Standard).</summary>
+    MartySama58
 }
 
 public class EixEpkReader
@@ -161,6 +163,7 @@ public class EixEpkReader
                 break;
 
             case EpkFormat.Standard:
+            case EpkFormat.MartySama58:
                 Lzo1xDecompress(compressedData, output);
                 break;
 
@@ -174,7 +177,7 @@ public class EixEpkReader
                     if (lzoLen != (int)realSize)
                         throw new InvalidDataException(
                             $"Decompression size mismatch: got {lzoLen}, expected {realSize}. " +
-                            "Set Format to EpkFormat.Standard or EpkFormat.FliegeV3 explicitly.");
+                            "Set Format to EpkFormat.Standard, EpkFormat.MartySama58, or EpkFormat.FliegeV3 explicitly.");
                 }
                 break;
         }

@@ -787,7 +787,7 @@ Options (where applicable):
   --passphrase <value>     Encryption passphrase (enables AES-256-GCM encryption)
   --compression <0-12>     Compression level (default: 3)
   --algorithm <name>       LZ4, Zstandard, or Brotli (default: LZ4)
-  --format <name>          Source EPK format: Auto, Standard, or FliegeV3 (default: Auto)
+  --format <name>          Source EPK format: Auto, Standard, FliegeV3, or MartySama58 (default: Auto)
   --mangle                 Obfuscate file names with SHA256
   --filter <glob>          Filter files by glob pattern (list, extract)
   --output <file>          Output file path (watch)

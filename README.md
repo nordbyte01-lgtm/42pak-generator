@@ -30,14 +30,14 @@ A modern, open-source pak file manager for the Metin2 private server community. 
 
 - **Create VPK archives** - Pack directories into single `.vpk` files with optional encryption and compression
 - **Manage existing archives** - Browse, search, extract, and validate VPK archives
-- **Convert EIX/EPK to VPK** - One-click migration from legacy EterPack format (supports both 40250 and FliegeV3 variants)
+- **Convert EIX/EPK to VPK** - One-click migration from legacy EterPack format (supports 40250, FliegeV3, and MartySama 5.8 variants)
 - **AES-256-GCM encryption** - Per-file authenticated encryption with unique nonces
 - **LZ4 / Zstandard / Brotli compression** - Choose the algorithm that fits your needs
 - **BLAKE3 content hashing** - Cryptographic integrity verification for every file
 - **HMAC-SHA256** - Archive-level tamper detection
 - **Filename mangling** - Optional obfuscation of file paths within archives
 - **Full CLI** - Standalone `42pak-cli` with pack, unpack, list, info, verify, diff, migrate, search, check-duplicates, and watch commands
-- **Metin2 C++ integration** - Drop-in client and server loader code for both 40250 and FliegeV3 source trees
+- **Metin2 C++ integration** - Drop-in client and server loader code for 40250, FliegeV3, and MartySama 5.8 source trees
 
 ## VPK vs EIX/EPK Comparison
 
@@ -136,7 +136,7 @@ The standalone CLI (`42pak-cli`) supports all operations:
 │   │   ├── VpkFormat/               # VPK header, entry, archive classes
 │   │   ├── Crypto/                  # AES-GCM, PBKDF2, BLAKE3, HMAC
 │   │   ├── Compression/             # LZ4 / Zstandard / Brotli compressors
-│   │   ├── Legacy/                  # EIX/EPK reader and converter (40250 + FliegeV3)
+│   │   ├── Legacy/                  # EIX/EPK reader and converter (40250 + FliegeV3 + MartySama 5.8)
 │   │   ├── Cli/                     # Shared CLI handler (12 commands)
 │   │   └── Utils/                   # Filename mangling, progress reporting
 │   ├── FortyTwoPak.CLI/             # Standalone CLI tool (42pak-cli)
@@ -148,6 +148,7 @@ The standalone CLI (`42pak-cli`) supports all operations:
 ├── Metin2Integration/
 │   ├── Client/
 │   │   ├── 40250/                   # C++ integration for 40250/ClientVS22 (HybridCrypt)
+│   │   ├── MartySama58/             # C++ integration for MartySama 5.8 (Boost + HybridCrypt)
 │   │   └── FliegeV3/                # C++ integration for FliegeV3 (XTEA/LZ4)
 │   └── Server/                      # Shared server-side VPK handler
 ├── docs/
@@ -221,9 +222,10 @@ For the full binary specification, see [docs/FORMAT_SPEC.md](docs/FORMAT_SPEC.md
 
 ### Metin2 Client Integration
 
-Two integration profiles are provided for different source trees:
+Three integration profiles are provided for different source trees:
 
 - **40250 / ClientVS22** (HybridCrypt, LZO): [Metin2Integration/Client/40250/INTEGRATION_GUIDE.md](Metin2Integration/Client/40250/INTEGRATION_GUIDE.md)
+- **MartySama 5.8** (Boost, HybridCrypt, LZO): [Metin2Integration/Client/MartySama58/INTEGRATION_GUIDE.md](Metin2Integration/Client/MartySama58/INTEGRATION_GUIDE.md)
 - **FliegeV3** (XTEA, LZ4): [Metin2Integration/Client/FliegeV3/INTEGRATION_GUIDE.md](Metin2Integration/Client/FliegeV3/INTEGRATION_GUIDE.md)
 
 ### Metin2 Server Integration

@@ -181,6 +181,15 @@
             <label>Passphrase</label>
             <input type="password" id="cv-pass" placeholder="Passphrase for output">
           </div>
+          <div class="field-row">
+            <label>Source Format</label>
+            <select id="cv-format">
+              <option value="Auto">Auto (detect)</option>
+              <option value="Standard">Standard (40250 / LZO)</option>
+              <option value="MartySama58">MartySama 5.8 (LZO)</option>
+              <option value="FliegeV3">FliegeV3 (LZ4)</option>
+            </select>
+          </div>
         </div>
         <div class="action-bar">
           <button class="btn-primary" id="btn-convert" onclick="convertPak()"><i class="fa-solid fa-right-left"></i> Convert</button>
